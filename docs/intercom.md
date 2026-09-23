@@ -48,6 +48,17 @@ The device sends `intercom` messages with its `session_id`:
 | `stop` | The user hung up on the device (button press or wake-word invoke). |
 | `busy` | A `start` arrived while the device was not idle, for example during a voice assistant conversation or an OTA upgrade. The call was rejected. |
 
+## Room name
+
+The server can name the device after its room with an MCP tool call over the control channel:
+
+```json
+{ "type": "mcp", "payload": { "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+  "params": { "name": "self.intercom.set_name", "arguments": { "name": "Kitchen" } } } }
+```
+
+The device stores the name (at most 40 characters) and shows it instead of "Standby" while idle. An empty name restores "Standby". The tool is user-only, so it is not offered to the voice assistant's model.
+
 ## Device behavior
 
 - The device accepts a call only while it is `Idle` or `Notifying`. An active notification is cancelled.

@@ -117,6 +117,9 @@ public:
     void SetAecMode(AecMode mode);
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
+    /** Intercom room name shown instead of "Standby" when idle; persisted in NVS. */
+    void SetDeviceName(const std::string& name);
+    const std::string& GetDeviceName() const { return device_name_; }
     AudioService& GetAudioService() { return audio_service_; }
     
     /**
@@ -153,6 +156,7 @@ private:
     bool pending_listening_start_ = false;  // Waiting for playback to drain before starting listening (auto mode)
     bool intercom_mic_enabled_ = false;     // Duplex intercom streams the microphone; receive-only does not
     std::string intercom_caller_;
+    std::string device_name_;  // Intercom room name (NVS "intercom"/"name")
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -179,6 +183,7 @@ private:
     void ContinueStartIntercom();
     void SetIntercomMic(bool enabled);
     void StopIntercom(bool notify_server);
+    const char* StandbyStatus() const;
 
     // Activation task (runs in background)
     void ActivationTask();

@@ -314,6 +314,21 @@ void McpServer::AddUserOnlyTools() {
     }
 #endif  // HAVE_LVGL
 
+#if CONFIG_ENABLE_INTERCOM
+    // The intercom hub names the device after its room; the idle screen shows the name
+    AddUserOnlyTool("self.intercom.set_name",
+                    "Set the room name this intercom speaker shows when idle",
+                    PropertyList({Property("name", kPropertyTypeString)}),
+                    [](const PropertyList& properties) -> ReturnValue {
+                        auto name = properties["name"].value<std::string>();
+                        if (name.size() > 40) {
+                            name.resize(40);
+                        }
+                        Application::GetInstance().SetDeviceName(name);
+                        return true;
+                    });
+#endif
+
     // Assets download url (always registered — Settings storage works regardless of partition
     // layout)
     AddUserOnlyTool("self.assets.set_download_url", "Set the download url for the assets",

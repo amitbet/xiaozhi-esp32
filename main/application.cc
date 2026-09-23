@@ -61,6 +61,9 @@ bool Application::SetDeviceState(DeviceState state) { return state_machine_.Tran
 void Application::Initialize() {
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
+#if CONFIG_ENABLE_INTERCOM
+    device_name_ = Settings("intercom", false).GetString("name");
+#endif
 
     // Setup the display
     auto display = board.GetDisplay();
@@ -773,7 +776,7 @@ void Application::DismissAlert() {
     last_error_message_.clear();
     if (GetDeviceState() == kDeviceStateIdle) {
         auto display = Board::GetInstance().GetDisplay();
-        display->SetStatus(Lang::Strings::STANDBY);
+        display->SetStatus(StandbyStatus());
         display->SetEmotion("neutral");
         display->SetChatMessage("system", "");
     }
@@ -1024,7 +1027,7 @@ void Application::HandleStateChangedEvent() {
             // queues STATE_CHANGED after Alert(), and the idle handler would
             // otherwise wipe the status, emotion, and chat message.
             if (last_error_message_.empty()) {
-                display->SetStatus(Lang::Strings::STANDBY);
+                display->SetStatus(StandbyStatus());
                 display->ClearChatMessages();  // Clear messages first
                 display->SetEmotion(
                     "neutral");  // Then set emotion (wechat mode checks child count)
@@ -1296,6 +1299,25 @@ void Application::StopIntercom(bool notify_server) {
     Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
     // The audio channel stays open; the server closes it (goodbye) when done
     SetDeviceState(kDeviceStateIdle);
+}
+
+const char* Application::StandbyStatus() const {
+    // Only intercom builds show the room name: some displays match the Standby string for emoji
+    return device_name_.empty() ? Lang::Strings::STANDBY : device_name_.c_str();
+}
+
+void Application::SetDeviceName(const std::string& name) {
+    Schedule([this, name]() {
+        if (name == device_name_) {
+            return;
+        }
+        device_name_ = name;
+        Settings("intercom", true).SetString("name", name);
+        ESP_LOGI(TAG, "Device name set to '%s'", name.c_str());
+        if (GetDeviceState() == kDeviceStateIdle && last_error_message_.empty()) {
+            Board::GetInstance().GetDisplay()->SetStatus(StandbyStatus());
+        }
+    });
 }
 
 void Application::Schedule(std::function<void()>&& callback) {

@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), plus this file.
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -102,7 +102,26 @@ Merge notes: `CreateUdp()` returns a `unique_ptr`; the code converts it to `shar
 `channel_mutex_`. Servers must ignore zero-length packets as audio; `xiaozhi-hub` does. This is standalone
 and cherry-pickable.
 
-## 5. Documentation
+## 5. Room name shown on the idle screen (feature, `CONFIG_ENABLE_INTERCOM`)
+
+The hub names each speaker after its room and pushes the name with an MCP tool call over MQTT
+(`tools/call` of `self.intercom.set_name` with `{"name": "Kitchen"}`). The device stores it in NVS and
+shows it instead of "Standby" when idle. An empty name restores "Standby".
+
+| What | Where |
+|---|---|
+| User-only MCP tool `self.intercom.set_name` (max 40 chars) | `main/mcp_server.cc`, end of `AddUserOnlyTools()`, guarded by `#if CONFIG_ENABLE_INTERCOM` |
+| `Application::SetDeviceName` (schedules, persists NVS `intercom`/`name`, refreshes idle status) and `GetDeviceName` | `main/application.cc`, before `Application::Schedule`; declarations `main/application.h` (public section, after `PlaySound`) |
+| Name loaded at boot | top of `Application::Initialize()` |
+| `StandbyStatus()` replaces `Lang::Strings::STANDBY` in `DismissAlert()` and the `kDeviceStateIdle` case of `HandleStateChangedEvent()` | `main/application.cc` |
+
+Merge notes: if upstream adds new places that set the idle status to `Lang::Strings::STANDBY`, use
+`StandbyStatus()` there too. Some emoji displays (`electron_emoji_display.cc`, `otto_emoji_display.cc`,
+`esp-hi/emoji_display.cc`, `emote_display.cc`) match the status text against `STANDBY`. The name only
+replaces it on intercom builds, where the name is set, so those boards are unaffected unless they enable
+intercom. NVS key `intercom`/`name` is persistent API.
+
+## 6. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.
