@@ -65,6 +65,7 @@ Merge notes:
 | What | Where |
 |---|---|
 | Build variant `esp32-s3-audio-board-intercom` (existing variant unchanged) adding `CONFIG_ENABLE_INTERCOM=y`, `CONFIG_USE_DEVICE_AEC=y` | `main/boards/waveshare/esp32-s3-audio-board/config.json:21` |
+| Wake word **Jarvis** instead of 你好小智 (`CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS=n`, `CONFIG_SR_WN_WN9_JARVIS_TTS=y`). The model is packed into the assets image (`generated_assets.bin` at `0x800000`), so flash it along with the app | same `config.json` variant |
 | Allow `USE_DEVICE_AEC` on this board (it has a hardware reference input, `AUDIO_INPUT_REFERENCE true`) | `main/Kconfig.projbuild:972`, end of the `USE_DEVICE_AEC` `depends on` list |
 
 Merge notes: upstream keeps extending that `depends on` list. On conflict, take upstream's list and

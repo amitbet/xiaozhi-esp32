@@ -30,7 +30,9 @@
                 "CONFIG_CAMERA_OV5640_DVP_YUV422_800X600_10FPS=y",
                 "CONFIG_CAMERA_OV5640_DVP_IF_FORMAT_INDEX_DEFAULT=0",
                 "CONFIG_ENABLE_INTERCOM=y",
-                "CONFIG_USE_DEVICE_AEC=y"
+                "CONFIG_USE_DEVICE_AEC=y",
+                "CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS=n",
+                "CONFIG_SR_WN_WN9_JARVIS_TTS=y"
             ]
         }
     ]
