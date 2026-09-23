@@ -15,6 +15,7 @@ static const char* const STATE_STRINGS[] = {
     "listening",
     "speaking",
     "notifying",
+    "intercom",
     "upgrading",
     "activating",
     "audio_testing",
@@ -75,14 +76,16 @@ bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) con
                    to == kDeviceStateListening ||
                    to == kDeviceStateSpeaking ||
                    to == kDeviceStateNotifying ||
+                   to == kDeviceStateIntercom ||
                    to == kDeviceStateActivating ||
                    to == kDeviceStateUpgrading ||
                    to == kDeviceStateWifiConfiguring;
 
         case kDeviceStateConnecting:
-            // Can go to idle (failed) or listening (success)
+            // Can go to idle (failed), listening (success) or intercom (server-initiated call)
             return to == kDeviceStateIdle ||
-                   to == kDeviceStateListening;
+                   to == kDeviceStateListening ||
+                   to == kDeviceStateIntercom;
 
         case kDeviceStateListening:
             // Can go to speaking or idle
@@ -95,6 +98,9 @@ bool DeviceStateMachine::IsValidTransition(DeviceState from, DeviceState to) con
                    to == kDeviceStateIdle;
 
         case kDeviceStateNotifying:
+            return to == kDeviceStateIdle;
+
+        case kDeviceStateIntercom:
             return to == kDeviceStateIdle;
 
         case kDeviceStateFatalError:

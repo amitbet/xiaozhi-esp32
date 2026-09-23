@@ -200,6 +200,7 @@ void WifiBoard::EnterWifiConfigMode() {
     auto state = app.GetDeviceState();
 
     if (state == kDeviceStateSpeaking || state == kDeviceStateNotifying ||
+        state == kDeviceStateIntercom ||
         state == kDeviceStateListening || state == kDeviceStateIdle) {
         // Reset protocol (close audio channel, reset protocol)
         Application::GetInstance().ResetProtocol();

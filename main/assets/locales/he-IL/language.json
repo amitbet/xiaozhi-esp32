@@ -24,6 +24,7 @@
         "CONNECTED_TO": "מחובר ל-",
         "LISTENING": "מקשיב...",
         "SPEAKING": "מדבר...",
+        "INTERCOM": "אינטרקום",
         "SERVER_NOT_FOUND": "מחפש שירות זמין",
         "SERVER_NOT_CONNECTED": "לא ניתן להתחבר לשירות, אנא נסה שוב מאוחר יותר",
         "SERVER_TIMEOUT": "פג זמן ההמתנה לתגובה",

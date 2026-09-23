@@ -151,6 +151,8 @@ private:
     bool assets_version_checked_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     bool pending_listening_start_ = false;  // Waiting for playback to drain before starting listening (auto mode)
+    bool intercom_mic_enabled_ = false;     // Duplex intercom streams the microphone; receive-only does not
+    std::string intercom_caller_;
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -172,6 +174,11 @@ private:
     void StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles);
     void StopNotification();
     void HandleNotificationFinished(uint32_t playback_id, bool success);
+    void HandleIntercomMessage(const cJSON* root);
+    void StartIntercom(bool mic_enabled, std::string caller);
+    void ContinueStartIntercom();
+    void SetIntercomMic(bool enabled);
+    void StopIntercom(bool notify_server);
 
     // Activation task (runs in background)
     void ActivationTask();

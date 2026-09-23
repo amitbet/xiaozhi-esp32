@@ -319,6 +319,9 @@ void Application::HandleNetworkDisconnectedEvent() {
     if (state == kDeviceStateNotifying) {
         StopNotification();
     }
+    if (state == kDeviceStateIntercom) {
+        StopIntercom(false);
+    }
     if (state == kDeviceStateConnecting || state == kDeviceStateListening ||
         state == kDeviceStateSpeaking) {
         ESP_LOGI(TAG, "Closing audio channel due to network disconnection");
@@ -552,7 +555,8 @@ void Application::InitializeProtocol() {
     });
 
     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
-        if (GetDeviceState() == kDeviceStateSpeaking) {
+        auto state = GetDeviceState();
+        if (state == kDeviceStateSpeaking || state == kDeviceStateIntercom) {
             audio_service_.PushPacketToDecodeQueue(std::move(packet));
         }
     });
@@ -616,6 +620,10 @@ void Application::InitializeProtocol() {
                       subtitles = std::move(subtitles)]() mutable {
                 StartNotification(std::move(url), std::move(subtitles));
             });
+#if CONFIG_ENABLE_INTERCOM
+        } else if (strcmp(type->valuestring, "intercom") == 0) {
+            HandleIntercomMessage(root);
+#endif
         } else if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
             if (!cJSON_IsString(state)) {
@@ -783,6 +791,11 @@ void Application::HandleToggleChatEvent() {
     if (state == kDeviceStateNotifying) {
         StopNotification();
         state = kDeviceStateIdle;
+    }
+
+    if (state == kDeviceStateIntercom) {
+        StopIntercom(true);
+        return;
     }
 
     if (state == kDeviceStateActivating) {
@@ -1058,6 +1071,19 @@ void Application::HandleStateChangedEvent() {
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
             break;
+        case kDeviceStateIntercom:
+            display->SetStatus(Lang::Strings::INTERCOM);
+            display->SetEmotion("neutral");
+            display->SetChatMessage("system", intercom_caller_.c_str());
+            board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+            audio_service_.EnableWakeWordDetection(false);
+            // Both branches reset the decoder, so the popup below is not cleared
+            audio_service_.EnableVoiceProcessing(intercom_mic_enabled_);
+            if (!intercom_mic_enabled_) {
+                audio_service_.ResetDecoder();
+            }
+            audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            break;
         case kDeviceStateWifiConfiguring:
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(false);
@@ -1162,6 +1188,114 @@ void Application::HandleNotificationFinished(uint32_t playback_id, bool success)
     ESP_LOGI(TAG, "Notification playback %lu %s", static_cast<unsigned long>(playback_id),
              success ? "completed" : "failed");
     StopNotification();
+}
+
+void Application::HandleIntercomMessage(const cJSON* root) {
+    auto state = cJSON_GetObjectItem(root, "state");
+    if (!cJSON_IsString(state)) {
+        ESP_LOGW(TAG, "Intercom message requires state");
+        return;
+    }
+    if (strcmp(state->valuestring, "start") == 0) {
+        // "duplex" (default) streams the microphone; "receive" only plays audio (PA)
+        auto mode = cJSON_GetObjectItem(root, "mode");
+        bool mic_enabled = !(cJSON_IsString(mode) && strcmp(mode->valuestring, "receive") == 0);
+        auto caller = cJSON_GetObjectItem(root, "caller");
+        std::string caller_str = cJSON_IsString(caller) ? caller->valuestring : "";
+        Schedule([this, mic_enabled, caller_str = std::move(caller_str)]() mutable {
+            StartIntercom(mic_enabled, std::move(caller_str));
+        });
+    } else if (strcmp(state->valuestring, "stop") == 0) {
+        Schedule([this]() { StopIntercom(false); });
+    } else {
+        ESP_LOGW(TAG, "Unknown intercom state: %s", state->valuestring);
+    }
+}
+
+void Application::StartIntercom(bool mic_enabled, std::string caller) {
+    auto state = GetDeviceState();
+
+    if (state == kDeviceStateIntercom) {
+        // A repeated start switches mode mid-call, e.g. for push-to-talk
+        if (!caller.empty() && caller != intercom_caller_) {
+            intercom_caller_ = std::move(caller);
+            Board::GetInstance().GetDisplay()->SetChatMessage("system", intercom_caller_.c_str());
+        }
+        SetIntercomMic(mic_enabled);
+        return;
+    }
+
+    if (state == kDeviceStateNotifying) {
+        StopNotification();
+        state = kDeviceStateIdle;
+    }
+
+    if (state != kDeviceStateIdle || !protocol_) {
+        ESP_LOGW(TAG, "Rejecting intercom call while device is busy (state: %d)", (int)state);
+        if (protocol_) {
+            protocol_->SendIntercomState("busy");
+        }
+        return;
+    }
+
+    ESP_LOGI(TAG, "Intercom call from '%s' (%s)", caller.c_str(),
+             mic_enabled ? "duplex" : "receive");
+    intercom_mic_enabled_ = mic_enabled;
+    intercom_caller_ = std::move(caller);
+
+    if (!protocol_->IsAudioChannelOpened()) {
+        SetDeviceState(kDeviceStateConnecting);
+        // Schedule to let the state change be processed first (UI update)
+        Schedule([this]() { ContinueStartIntercom(); });
+        return;
+    }
+    SetDeviceState(kDeviceStateIntercom);
+}
+
+void Application::ContinueStartIntercom() {
+    // Check state again in case it was changed during scheduling
+    if (GetDeviceState() != kDeviceStateConnecting) {
+        return;
+    }
+
+    Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    if (!protocol_->IsAudioChannelOpened() && !protocol_->OpenAudioChannel()) {
+        SetDeviceState(kDeviceStateIdle);
+        return;
+    }
+    SetDeviceState(kDeviceStateIntercom);
+}
+
+void Application::SetIntercomMic(bool enabled) {
+    if (enabled == intercom_mic_enabled_) {
+        return;
+    }
+    intercom_mic_enabled_ = enabled;
+    // Enabling voice processing resets the decoder, dropping queued playback
+    audio_service_.EnableVoiceProcessing(enabled);
+    if (!enabled) {
+        while (audio_service_.PopPacketFromSendQueue()) {
+            // Discard microphone audio captured before the mute.
+        }
+    }
+}
+
+void Application::StopIntercom(bool notify_server) {
+    if (GetDeviceState() != kDeviceStateIntercom) {
+        return;
+    }
+    ESP_LOGI(TAG, "Intercom call ended by %s", notify_server ? "device" : "server");
+    if (notify_server && protocol_) {
+        protocol_->SendIntercomState("stop");
+        audio_service_.ResetDecoder();
+    }
+    while (audio_service_.PopPacketFromSendQueue()) {
+        // Do not send microphone audio after the call ends.
+    }
+    intercom_caller_.clear();
+    Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+    // The audio channel stays open; the server closes it (goodbye) when done
+    SetDeviceState(kDeviceStateIdle);
 }
 
 void Application::Schedule(std::function<void()>&& callback) {
@@ -1294,6 +1428,8 @@ void Application::WakeWordInvoke(const std::string& wake_word) {
                 protocol_->CloseAudioChannel();
             }
         });
+    } else if (state == kDeviceStateIntercom) {
+        Schedule([this]() { StopIntercom(true); });
     }
 }
 

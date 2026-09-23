@@ -84,6 +84,8 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
     auto password = settings.GetString("password");
     int keepalive_interval = settings.GetInt("keepalive", 240);
     publish_topic_ = settings.GetString("publish_topic");
+    // Optional: brokers that do not push to clients unasked (e.g. Mosquitto) need a subscription
+    subscribe_topic_ = settings.GetString("subscribe_topic");
 
     if (endpoint.empty()) {
         ESP_LOGW(TAG, "MQTT endpoint is not specified");
@@ -107,6 +109,9 @@ bool MqttProtocol::StartMqttClient(bool report_error) {
     });
 
     mqtt_->OnConnected([this]() {
+        if (!subscribe_topic_.empty() && !mqtt_->Subscribe(subscribe_topic_, 0)) {
+            ESP_LOGE(TAG, "Failed to subscribe to %s", subscribe_topic_.c_str());
+        }
         if (on_connected_ != nullptr) {
             on_connected_();
         }
@@ -373,10 +378,18 @@ bool MqttProtocol::OpenAudioChannel() {
                  connected.error().ToString().c_str());
         return false;
     }
+    // Announce our UDP address with a header-only packet, so the server can send audio
+    // before the microphone does (e.g. receive-only intercom calls)
+    std::shared_ptr<Udp> channel = std::move(udp);
+    std::string announce;
     {
         std::lock_guard<std::mutex> lock(channel_mutex_);
-        udp_ = std::move(udp);
+        announce = aes_nonce_;
+        const uint32_t sequence = htonl(++local_sequence_);
+        memcpy(announce.data() + 12, &sequence, sizeof(sequence));
+        udp_ = channel;
     }
+    channel->Send(announce);
 
     if (on_audio_channel_opened_ != nullptr) {
         on_audio_channel_opened_();

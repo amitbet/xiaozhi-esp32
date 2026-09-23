@@ -105,6 +105,12 @@ void Protocol::SendMcpMessage(const std::string& payload) {
     SendText(message);
 }
 
+void Protocol::SendIntercomState(const std::string& state) {
+    std::string message = "{\"session_id\":\"" + session_id_ +
+                          "\",\"type\":\"intercom\",\"state\":\"" + state + "\"}";
+    SendText(message);
+}
+
 bool Protocol::IsTimeout() const {
     const int kTimeoutSeconds = 120;
     auto now = std::chrono::steady_clock::now();
