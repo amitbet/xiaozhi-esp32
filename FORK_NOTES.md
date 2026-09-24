@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5) and audio controls (item 6).
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -36,9 +36,9 @@ in duplex mode, streams the microphone continuously. A repeated `start` changes 
 | Transitions `Idle→Intercom`, `Connecting→Intercom`, `Intercom→Idle` | `main/device_state_machine.cc:79`, `:88`, `:103` (`IsValidTransition`) |
 | Message dispatch `"intercom"` (guarded by `#if CONFIG_ENABLE_INTERCOM`) | `main/application.cc:623`, in the `OnIncomingJson` lambda of `InitializeProtocol()` |
 | Play incoming audio while in Intercom (not only Speaking) | `main/application.cc:559`, `OnIncomingAudio` lambda |
-| State entry: status text, caller, performance power, wake word off, `EnableVoiceProcessing(mic)`, popup sound | `main/application.cc:1074`, `case kDeviceStateIntercom` in `HandleStateChangedEvent()` |
+| State entry: status text, caller, performance power, wake word off, `EnableVoiceProcessing(mic)`, popup sound only when the start message has `"chime": true` (`intercom_chime_`) | `main/application.cc:1074`, `case kDeviceStateIntercom` in `HandleStateChangedEvent()` |
 | Handlers `HandleIntercomMessage`, `StartIntercom`, `ContinueStartIntercom`, `SetIntercomMic`, `StopIntercom` | `main/application.cc:1193`–`1300`; declarations `main/application.h:177` |
-| Members `intercom_mic_enabled_`, `intercom_caller_` | `main/application.h:154` |
+| Members `intercom_mic_enabled_`, `intercom_caller_`, `intercom_chime_` | `main/application.h:154` |
 | Button (`ToggleChatState`) hangs up during a call | `main/application.cc:796`, top of `HandleToggleChatEvent()` |
 | `WakeWordInvoke` (board buttons) hangs up during a call | `main/application.cc:1431` |
 | Network loss ends the call | `main/application.cc:322`, `HandleNetworkDisconnectedEvent()` |
@@ -137,7 +137,20 @@ Merge notes: if upstream starts calling `SetInputGain` from board code or persis
 reconcile with the NVS `intercom`/`mic_gain` value (the fork's value is applied after codec init). The
 `BoxAudioCodec` override takes `data_if_mutex_` like `EnableInput`. Keep that if upstream changes the locking.
 
-## 7. Documentation
+## 7. `notify` without the popup (`"chime": false`)
+
+Not behind `CONFIG_ENABLE_INTERCOM`: it extends the upstream `notify` message. The hub rings speakers
+with `notify` and a ring sound, and the popup before a ring would be a second alert.
+
+| What | Where |
+|---|---|
+| Parse optional `chime` (default true) and pass it on | `main/application.cc`, `"notify"` branch of the `OnIncomingJson` lambda |
+| `StartNotification(url, subtitles, chime = true)` skips `PlaySound(OGG_POPUP)` when false | `main/application.cc`, `Application::StartNotification`; declaration `main/application.h` |
+
+Merge notes: if upstream changes `StartNotification`'s signature or moves the popup, keep the flag.
+Documented in `docs/notify.md`.
+
+## 8. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

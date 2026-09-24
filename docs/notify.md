@@ -26,6 +26,8 @@ MQTT device, this is the existing MQTT control topic:
 
 `audio_url` is required. Both `http://` and `https://` URLs are accepted. HTTP is useful for local-network development, while production deployments can enforce HTTPS when generating the URL.
 
+`chime` is optional. The device plays its built-in popup before the audio unless `chime` is `false`. Set it to `false` when the audio is itself an alert, such as a ring.
+
 `subtitles` is optional. Each entry contains the media start time in milliseconds and the text to display. The device sorts entries by `start_ms` and updates the display only when playback crosses a new subtitle entry.
 
 The message has no acknowledgement, notification ID, state, kind, or expiry field. Delivery is best effort and only applies to online devices.
@@ -46,7 +48,7 @@ The device accepts `notify` only while it is in `Idle`. It then performs the fol
 
 1. Enters the internal `Notifying` state and switches the board to performance mode.
 2. Disables normal voice processing and microphone uplink.
-3. Clears previous playback and queues the built-in popup sound.
+3. Clears previous playback and queues the built-in popup sound (skipped when `chime` is `false`).
 4. Starts one HTTP GET in a background task.
 5. Incrementally demultiplexes Ogg packets and sends them directly to the existing Opus decode queue.
 6. Displays subtitles according to the media position of Opus packets reaching the audio output task.

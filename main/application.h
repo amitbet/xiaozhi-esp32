@@ -156,6 +156,7 @@ private:
     bool pending_listening_start_ = false;  // Waiting for playback to drain before starting listening (auto mode)
     bool intercom_mic_enabled_ = false;     // Duplex intercom streams the microphone; receive-only does not
     std::string intercom_caller_;
+    bool intercom_chime_ = false;           // Play the popup when a call starts (off by default)
     std::string device_name_;  // Intercom room name (NVS "intercom"/"name")
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
@@ -175,11 +176,12 @@ private:
     void ContinueWakeWordInvoke(const std::string& wake_word);
     void StartListeningAudio();
     void ConfigureWakeWordForListening();
-    void StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles);
+    void StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles,
+                           bool chime = true);
     void StopNotification();
     void HandleNotificationFinished(uint32_t playback_id, bool success);
     void HandleIntercomMessage(const cJSON* root);
-    void StartIntercom(bool mic_enabled, std::string caller);
+    void StartIntercom(bool mic_enabled, std::string caller, bool chime);
     void ContinueStartIntercom();
     void SetIntercomMic(bool enabled);
     void StopIntercom(bool notify_server);

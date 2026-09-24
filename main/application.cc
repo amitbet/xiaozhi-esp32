@@ -625,9 +625,12 @@ void Application::InitializeProtocol() {
                 }
             }
 
+            // "chime": false skips the popup before the audio, e.g. when the audio is a ring
+            auto chime = cJSON_GetObjectItem(root, "chime");
+            bool play_chime = !cJSON_IsFalse(chime);
             Schedule([this, url = std::string(audio_url->valuestring),
-                      subtitles = std::move(subtitles)]() mutable {
-                StartNotification(std::move(url), std::move(subtitles));
+                      subtitles = std::move(subtitles), play_chime]() mutable {
+                StartNotification(std::move(url), std::move(subtitles), play_chime);
             });
 #if CONFIG_ENABLE_INTERCOM
         } else if (strcmp(type->valuestring, "intercom") == 0) {
@@ -1091,7 +1094,9 @@ void Application::HandleStateChangedEvent() {
             if (!intercom_mic_enabled_) {
                 audio_service_.ResetDecoder();
             }
-            audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            if (intercom_chime_) {
+                audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            }
             break;
         case kDeviceStateWifiConfiguring:
             audio_service_.EnableVoiceProcessing(false);
@@ -1133,7 +1138,8 @@ void Application::ConfigureWakeWordForListening() {
 #endif
 }
 
-void Application::StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles) {
+void Application::StartNotification(std::string audio_url, std::vector<NotifySubtitle> subtitles,
+                                    bool chime) {
     if (GetDeviceState() != kDeviceStateIdle || notify_player_.IsBusy()) {
         ESP_LOGW(TAG, "Ignoring notify message while device is busy");
         return;
@@ -1158,7 +1164,9 @@ void Application::StartNotification(std::string audio_url, std::vector<NotifySub
     if (playback_id == 0) {
         playback_id = ++notification_playback_id_;
     }
-    audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+    if (chime) {
+        audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+    }
 
     bool started = notify_player_.Start(
         std::move(audio_url), std::move(subtitles), playback_id,
@@ -1211,8 +1219,10 @@ void Application::HandleIntercomMessage(const cJSON* root) {
         bool mic_enabled = !(cJSON_IsString(mode) && strcmp(mode->valuestring, "receive") == 0);
         auto caller = cJSON_GetObjectItem(root, "caller");
         std::string caller_str = cJSON_IsString(caller) ? caller->valuestring : "";
-        Schedule([this, mic_enabled, caller_str = std::move(caller_str)]() mutable {
-            StartIntercom(mic_enabled, std::move(caller_str));
+        // Calls open silently unless the server asks for the popup ("chime": true)
+        bool chime = cJSON_IsTrue(cJSON_GetObjectItem(root, "chime"));
+        Schedule([this, mic_enabled, caller_str = std::move(caller_str), chime]() mutable {
+            StartIntercom(mic_enabled, std::move(caller_str), chime);
         });
     } else if (strcmp(state->valuestring, "stop") == 0) {
         Schedule([this]() { StopIntercom(false); });
@@ -1221,7 +1231,7 @@ void Application::HandleIntercomMessage(const cJSON* root) {
     }
 }
 
-void Application::StartIntercom(bool mic_enabled, std::string caller) {
+void Application::StartIntercom(bool mic_enabled, std::string caller, bool chime) {
     auto state = GetDeviceState();
 
     if (state == kDeviceStateIntercom) {
@@ -1251,6 +1261,7 @@ void Application::StartIntercom(bool mic_enabled, std::string caller) {
              mic_enabled ? "duplex" : "receive");
     intercom_mic_enabled_ = mic_enabled;
     intercom_caller_ = std::move(caller);
+    intercom_chime_ = chime;
 
     if (!protocol_->IsAudioChannelOpened()) {
         SetDeviceState(kDeviceStateConnecting);
