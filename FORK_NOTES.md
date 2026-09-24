@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5).
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5) and audio controls (item 6).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -122,7 +122,22 @@ Merge notes: if upstream adds new places that set the idle status to `Lang::Stri
 replaces it on intercom builds, where the name is set, so those boards are unaffected unless they enable
 intercom. NVS key `intercom`/`name` is persistent API.
 
-## 6. Documentation
+## 6. Speaker volume and mic sensitivity from the hub (feature, `CONFIG_ENABLE_INTERCOM`)
+
+The hub reads and sets both per speaker over MQTT MCP calls. Volume already had a tool upstream
+(`self.audio_speaker.set_volume`, persisted by `AudioCodec` in NVS `audio`/`output_volume`). The fork adds:
+
+| What | Where |
+|---|---|
+| User-only tools `self.intercom.set_mic_gain` (`gain` 0-37 dB, persisted in NVS `intercom`/`mic_gain` as tenths of a dB) and `self.intercom.get_audio` (returns `{"volume", "mic_gain", "mic_gain_max"}`) | `main/mcp_server.cc`, `AddUserOnlyTools()`, in the same `#if CONFIG_ENABLE_INTERCOM` block as `set_name` |
+| Saved mic gain restored at boot | `Application::Initialize()`, right after `audio_service_.Initialize(codec)` |
+| `BoxAudioCodec::SetInputGain` override so a change applies while the mic is open (upstream applies the gain only in `EnableInput`) | `main/audio/codecs/box_audio_codec.cc`/`.h` |
+
+Merge notes: if upstream starts calling `SetInputGain` from board code or persists input gain itself,
+reconcile with the NVS `intercom`/`mic_gain` value (the fork's value is applied after codec init). The
+`BoxAudioCodec` override takes `data_if_mutex_` like `EnableInput`. Keep that if upstream changes the locking.
+
+## 7. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.
@@ -141,6 +156,7 @@ intercom. NVS key `intercom`/`name` is persistent API.
 2. Run the host tests: `python3 -m unittest discover -s scripts/tests`.
 3. Run the hub's end-to-end test with a simulated device (homeauto `compose/xiaozhi-hub/tests/e2e.py`).
    It exercises the MQTT hello, UDP announce, push-to-talk mode switch, and hangup.
-4. On hardware: flash it, confirm it reaches `idle` over MQTT, then call it from the hub UI or the Home
+4. On hardware: flash it (or update it over the air: put the `.bin` in the hub's `data/firmware/`
+   and call the `self.upgrade_firmware` MCP tool with its `http://<hub>:8003/firmware/<file>.bin` URL), confirm it reaches `idle` over MQTT, then call it from the hub UI or the Home
    Intercom DynApp. Check hold-to-talk (speaker plays and its mic is off), release (the device mic is heard),
    the button hangup, announce to all, and an open call without echo.

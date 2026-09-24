@@ -74,6 +74,12 @@ void Application::Initialize() {
     // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
+#if CONFIG_ENABLE_INTERCOM
+    // Mic gain chosen from the intercom hub (self.intercom.set_mic_gain); tenths of a dB in NVS
+    if (int saved = Settings("intercom", false).GetInt("mic_gain", -1); saved >= 0) {
+        codec->SetInputGain(saved / 10.0f);
+    }
+#endif
     audio_service_.Start();
     ESP_LOGI(TAG, "After board/audio init");
     SystemInfo::PrintHeapStats();

@@ -327,6 +327,25 @@ void McpServer::AddUserOnlyTools() {
                         Application::GetInstance().SetDeviceName(name);
                         return true;
                     });
+    // Mic sensitivity and the combined audio state, for the intercom hub's volume and gain controls
+    AddUserOnlyTool("self.intercom.set_mic_gain",
+                    "Set the microphone input gain in dB (0-37)",
+                    PropertyList({Property("gain", kPropertyTypeInteger, 0, 37)}),
+                    [](const PropertyList& properties) -> ReturnValue {
+                        int gain = properties["gain"].value<int>();
+                        Board::GetInstance().GetAudioCodec()->SetInputGain(static_cast<float>(gain));
+                        Settings("intercom", true).SetInt("mic_gain", gain * 10);
+                        return true;
+                    });
+    AddUserOnlyTool("self.intercom.get_audio",
+                    "Get the speaker volume (0-100) and microphone gain (dB)",
+                    PropertyList(),
+                    [](const PropertyList& properties) -> ReturnValue {
+                        auto codec = Board::GetInstance().GetAudioCodec();
+                        return "{\"volume\":" + std::to_string(codec->output_volume()) +
+                               ",\"mic_gain\":" + std::to_string(static_cast<int>(codec->input_gain() + 0.5f)) +
+                               ",\"mic_gain_max\":37}";
+                    });
 #endif
 
     // Assets download url (always registered — Settings storage works regardless of partition
