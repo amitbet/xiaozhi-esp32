@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7).
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7) and the silent wake word (item 8).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -150,7 +150,19 @@ with `notify` and a ring sound, and the popup before a ring would be a second al
 Merge notes: if upstream changes `StartNotification`'s signature or moves the popup, keep the flag.
 Documented in `docs/notify.md`.
 
-## 8. Documentation
+## 8. Wake word: lights only, no sound (`CONFIG_ENABLE_INTERCOM`)
+
+With no assistant behind the hub, a false "Jarvis" should not make noise. The hub no longer sends an
+alert (the firmware plays `OGG_VIBRATION` with every alert) and closes the channel after 3 s.
+
+| What | Where |
+|---|---|
+| `kWakeWordSound` (false in intercom builds) replaces the popup on wake: `PlaySound(OGG_POPUP)` in the Listening branch of `HandleWakeWordDetectedEvent()`, and `play_popup_on_listening_ = true` there and in `ContinueWakeWordInvoke()` | `main/application.cc`, top of file and those functions |
+| LED ring shows a spinning blue light (`Scroll`) in Listening instead of solid red | `main/led/circular_strip.cc`, `OnStateChanged()`, `#if CONFIG_ENABLE_INTERCOM` case |
+
+Merge notes: if upstream adds more popup calls on the wake path, gate them with `kWakeWordSound` too.
+
+## 9. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

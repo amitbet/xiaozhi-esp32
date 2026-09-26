@@ -203,7 +203,17 @@ void CircularStrip::OnStateChanged() {
             SetAllColor(color);
             break;
         }
+#if CONFIG_ENABLE_INTERCOM
+        case kDeviceStateListening: {
+            // Wake word heard: a spinning blue light, like Alexa (intercom builds play no sound)
+            StripColor low = { 0, 0, low_brightness_ };
+            StripColor high = { 0, low_brightness_, default_brightness_ };
+            Scroll(low, high, 2, 80);
+            break;
+        }
+#else
         case kDeviceStateListening:
+#endif
         case kDeviceStateAudioTesting: {
             StripColor color = { default_brightness_, low_brightness_, low_brightness_ };
             SetAllColor(color);

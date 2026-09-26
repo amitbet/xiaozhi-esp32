@@ -21,6 +21,13 @@
 
 #define TAG "Application"
 
+#if CONFIG_ENABLE_INTERCOM
+// Intercom builds: the wake word only lights the LED ring (see CircularStrip), no popup sound
+static constexpr bool kWakeWordSound = false;
+#else
+static constexpr bool kWakeWordSound = true;
+#endif
+
 Application::Application() : notify_player_(audio_service_) {
     event_group_ = xEventGroupCreate();
 
@@ -942,12 +949,14 @@ void Application::HandleWakeWordDetectedEvent() {
         if (state == kDeviceStateListening) {
             protocol_->SendStartListening(GetDefaultListeningMode());
             audio_service_.ResetDecoder();
-            audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            if (kWakeWordSound) {
+                audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
+            }
             // Re-enable wake word detection as it was stopped by the detection itself
             audio_service_.EnableWakeWordDetection(true);
         } else {
             // Play popup sound and start listening again
-            play_popup_on_listening_ = true;
+            play_popup_on_listening_ = kWakeWordSound;
             SetListeningMode(GetDefaultListeningMode());
         }
     } else if (state == kDeviceStateActivating) {
@@ -1012,7 +1021,7 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
 #else
     // Set flag to play popup sound after state changes to listening
     // (PlaySound here would be cleared by ResetDecoder in EnableVoiceProcessing)
-    play_popup_on_listening_ = true;
+    play_popup_on_listening_ = kWakeWordSound;
     SetListeningMode(GetDefaultListeningMode());
 #endif
 }
