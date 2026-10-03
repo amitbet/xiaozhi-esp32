@@ -202,7 +202,18 @@ makes the ring spin blue, as after the wake word, instead of the call colour.
 | Member `intercom_listening_`, `IsIntercomListening()` (only while the mic is on) | `main/application.h` |
 | Blue spin while Intercom and listening | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
 
-## 12. Documentation
+## 12. Stray LED after the ring (Waveshare ESP32-S3-AUDIO-Board)
+
+A 7th LED on the strip's data line, past the ring of 6, never got data and showed whatever it latched at
+boot (stuck red, later blue). `CircularStrip` takes `dark_leds`: the driver is sized for the ring plus those
+LEDs and only the ring is drawn, so every refresh sends black to them.
+
+| What | Where |
+|---|---|
+| `dark_leds` constructor argument (default 0), `max_leds` = ring + dark | `main/led/circular_strip.h`, `circular_strip.cc` constructor |
+| `CircularStrip led(BUILTIN_LED_GPIO, 6, 1)` | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `GetLed()` |
+
+## 13. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

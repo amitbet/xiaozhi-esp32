@@ -251,7 +251,8 @@ public:
     }
 
     virtual Led* GetLed() override {
-        static CircularStrip led(BUILTIN_LED_GPIO, 6);
+        // A 7th LED after the ring of 6 kept a random colour (red, later blue): keep it off
+        static CircularStrip led(BUILTIN_LED_GPIO, 6, 1);
         return &led;
     }
 
