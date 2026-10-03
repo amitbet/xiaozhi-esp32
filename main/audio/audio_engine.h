@@ -21,6 +21,8 @@ public:
     virtual void EnableWakeWordDetection(bool enable) = 0;
     virtual void EnableVoiceProcessing(bool enable) = 0;
     virtual void EnableDeviceAec(bool enable) = 0;
+    // WakeNet detection threshold (0.4-0.9999); 0 restores the model default. Returns false if unsupported.
+    virtual bool SetWakeThreshold(float threshold) { return false; }
 
     virtual bool HasWakeWord() const = 0;
     virtual bool IsWakeWordDetectionEnabled() const = 0;

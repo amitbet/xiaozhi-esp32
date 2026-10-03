@@ -86,6 +86,10 @@ void Application::Initialize() {
     if (int saved = Settings("intercom", false).GetInt("mic_gain", -1); saved >= 0) {
         codec->SetInputGain(saved / 10.0f);
     }
+    // Wake word threshold (self.intercom.set_wake_threshold), thousandths in NVS; 0 = model default
+    if (int saved = Settings("intercom", false).GetInt("wake_thr", 0); saved > 0) {
+        audio_service_.SetWakeThreshold(saved / 1000.0f);
+    }
 #endif
     audio_service_.Start();
     ESP_LOGI(TAG, "After board/audio init");

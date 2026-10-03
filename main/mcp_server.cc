@@ -337,6 +337,19 @@ void McpServer::AddUserOnlyTools() {
                         Settings("intercom", true).SetInt("mic_gain", gain * 10);
                         return true;
                     });
+    AddUserOnlyTool("self.intercom.set_wake_threshold",
+                    "Set the wake word detection threshold in percent (40-99; higher = fewer false triggers, "
+                    "lower = easier to trigger). 0 restores the model default",
+                    PropertyList({Property("percent", kPropertyTypeInteger, 0, 99)}),
+                    [](const PropertyList& properties) -> ReturnValue {
+                        int percent = properties["percent"].value<int>();
+                        // Out-of-range values (1-39) are rejected by SetWakeThreshold
+                        if (!Application::GetInstance().GetAudioService().SetWakeThreshold(percent / 100.0f)) {
+                            return false;
+                        }
+                        Settings("intercom", true).SetInt("wake_thr", percent * 10);
+                        return true;
+                    });
     AddUserOnlyTool("self.intercom.get_audio",
                     "Get the speaker volume (0-100) and microphone gain (dB)",
                     PropertyList(),
@@ -344,7 +357,8 @@ void McpServer::AddUserOnlyTools() {
                         auto codec = Board::GetInstance().GetAudioCodec();
                         return "{\"volume\":" + std::to_string(codec->output_volume()) +
                                ",\"mic_gain\":" + std::to_string(static_cast<int>(codec->input_gain() + 0.5f)) +
-                               ",\"mic_gain_max\":37}";
+                               ",\"mic_gain_max\":37,\"wake_threshold\":" +
+                               std::to_string(Settings("intercom", false).GetInt("wake_thr", 0) / 10) + "}";
                     });
 #endif
 

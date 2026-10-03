@@ -31,6 +31,7 @@ public:
     void EnableWakeWordDetection(bool enable) override;
     void EnableVoiceProcessing(bool enable) override;
     void EnableDeviceAec(bool enable) override;
+    bool SetWakeThreshold(float threshold) override;
 
     bool HasWakeWord() const override;
     bool IsWakeWordDetectionEnabled() const override;
@@ -70,6 +71,8 @@ private:
     int frame_samples_ = 0;
     bool is_speaking_ = false;
     std::atomic<bool> device_aec_enabled_{false};
+    // Deferred WakeNet threshold (<0 = nothing pending, 0 = reset to model default)
+    std::atomic<float> pending_wake_threshold_{-1.0f};
     // Deferred AFE buffer reset, performed by ProcessingTask (see UpdateActiveState)
     std::atomic<bool> reset_pending_{false};
     // Deferred WakeNet/AEC toggles, applied by ProcessingTask (see ApplyAfeControls)

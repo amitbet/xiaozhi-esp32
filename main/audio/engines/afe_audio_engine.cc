@@ -150,7 +150,12 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
     afe_config->aec_init = codec_->input_reference();
     afe_config->aec_mode = AEC_MODE_FD_LOW_COST;
     afe_config->aec_nlp_level = AEC_NLP_LEVEL_VERYAGGR;
+#if CONFIG_ENABLE_INTERCOM
+    // Cuts room noise before WakeNet sees it: fewer false triggers and misses
+    afe_config->ns_init = true;
+#else
     afe_config->ns_init = false;
+#endif
     afe_config->vad_init = kUseAfeForVoiceProcessing;
     afe_config->vad_mode = VAD_MODE_0;
     afe_config->vad_min_noise_ms = 100;
@@ -372,8 +377,26 @@ void AfeAudioEngine::UpdateAecState() {
     afe_control_dirty_ = true;
 }
 
+bool AfeAudioEngine::SetWakeThreshold(float threshold) {
+    if (afe_data_ == nullptr || wake_detector_ != WakeDetector::kWakeNet) {
+        return false;
+    }
+    if (threshold != 0 && (threshold < 0.4f || threshold > 0.9999f)) {
+        return false;
+    }
+    pending_wake_threshold_ = threshold;
+    afe_control_dirty_ = true;
+    return true;
+}
+
 void AfeAudioEngine::ApplyAfeControls() {
     EventBits_t bits = xEventGroupGetBits(event_group_);
+    float threshold = pending_wake_threshold_.exchange(-1.0f);
+    if (threshold == 0) {
+        afe_iface_->reset_wakenet_threshold(afe_data_, 1);
+    } else if (threshold > 0) {
+        afe_iface_->set_wakenet_threshold(afe_data_, 1, threshold);
+    }
     if (wake_detector_ == WakeDetector::kWakeNet) {
         if (bits & kWakeWordEnabled) {
             afe_iface_->enable_wakenet(afe_data_);

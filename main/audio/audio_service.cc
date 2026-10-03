@@ -759,6 +759,17 @@ void AudioService::EnableDeviceAec(bool enable) {
     }
 }
 
+bool AudioService::SetWakeThreshold(float threshold) {
+    if (threshold != 0 && (threshold < 0.4f || threshold > 0.9999f)) {
+        return false;
+    }
+    wake_threshold_ = threshold;
+    if (audio_engine_initialized_) {
+        return audio_engine_->SetWakeThreshold(threshold);
+    }
+    return true;
+}
+
 void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) { callbacks_ = callbacks; }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
@@ -877,5 +888,8 @@ bool AudioService::InitializeAudioEngine() {
     }
     audio_engine_initialized_ = true;
     audio_engine_->EnableDeviceAec(device_aec_enabled_);
+    if (wake_threshold_ != 0) {
+        audio_engine_->SetWakeThreshold(wake_threshold_);
+    }
     return true;
 }

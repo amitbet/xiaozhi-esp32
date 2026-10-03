@@ -138,6 +138,8 @@ public:
     void EnableVoiceProcessing(bool enable);
     void EnableAudioTesting(bool enable);
     void EnableDeviceAec(bool enable);
+    // Remembered and applied once the engine exists (it initializes lazily); 0 = model default
+    bool SetWakeThreshold(float threshold);
 
     void SetCallbacks(AudioServiceCallbacks& callbacks);
 
@@ -199,6 +201,7 @@ private:
 
     bool audio_engine_initialized_ = false;
     bool voice_detected_ = false;
+    float wake_threshold_ = 0;
 #if CONFIG_USE_DEVICE_AEC
     bool device_aec_enabled_ = true;
 #else
