@@ -29,6 +29,7 @@ Start a call:
 - `mode` is optional. `duplex` (the default) streams the microphone continuously for the whole call. `receive` plays incoming audio only and keeps the microphone off, which suits one-way PA announcements.
 - `caller` is optional. The device shows it on the display.
 - `chime` is optional. A call opens silently unless it is `true`, in which case the device plays its popup sound first. To ring a device before talking, send a [`notify`](notify.md) with a ring sound instead.
+- `listening` is optional. When `true` and the microphone is on, the LED ring spins blue as after the wake word: the server is waiting for a spoken reply (an assistant follow-up), not a call.
 
 Sending `start` again during a call changes `mode` without ending the call. A server can use this for push-to-talk on devices without AEC: send `receive` while the remote side talks and `duplex` while it listens. Enabling the microphone resets the decoder, so queued playback is dropped at the switch.
 

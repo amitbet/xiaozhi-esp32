@@ -1256,7 +1256,10 @@ void Application::HandleIntercomMessage(const cJSON* root) {
         std::string caller_str = cJSON_IsString(caller) ? caller->valuestring : "";
         // Calls open silently unless the server asks for the popup ("chime": true)
         bool chime = cJSON_IsTrue(cJSON_GetObjectItem(root, "chime"));
-        Schedule([this, mic_enabled, caller_str = std::move(caller_str), chime]() mutable {
+        // The hub waits for a spoken reply (assistant follow-up): the ring spins blue while the mic is on
+        bool listening = cJSON_IsTrue(cJSON_GetObjectItem(root, "listening"));
+        Schedule([this, mic_enabled, caller_str = std::move(caller_str), chime, listening]() mutable {
+            intercom_listening_ = listening;
             StartIntercom(mic_enabled, std::move(caller_str), chime);
         });
     } else if (strcmp(state->valuestring, "stop") == 0) {
@@ -1289,6 +1292,7 @@ void Application::StartIntercom(bool mic_enabled, std::string caller, bool chime
             Board::GetInstance().GetDisplay()->SetChatMessage("system", intercom_caller_.c_str());
         }
         SetIntercomMic(mic_enabled);
+        Board::GetInstance().GetLed()->OnStateChanged();  // "listening" may have changed
         return;
     }
 
@@ -1361,6 +1365,7 @@ void Application::StopIntercom(bool notify_server) {
         // Do not send microphone audio after the call ends.
     }
     intercom_caller_.clear();
+    intercom_listening_ = false;
     Board::GetInstance().SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
     // The audio channel stays open; the server closes it (goodbye) when done
     SetDeviceState(kDeviceStateIdle);

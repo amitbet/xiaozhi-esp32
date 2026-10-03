@@ -189,7 +189,20 @@ Node-RED sends the same short ding for different events; a colour tells them apa
 | `SetNotifyLight` (colour names), `GetNotifyLight`; seconds counted down on the clock tick | `main/application.cc`, before `IntercomKey()`; `main/application.h` |
 | Ring breathes in the colour while Idle/Notifying and the light is active; plain notifies are soft white instead of green | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
 
-## 11. Documentation
+## 11. Assistant follow-up light (`"listening"`; `CONFIG_ENABLE_INTERCOM`)
+
+After a spoken assistant reply the hub keeps listening through an intercom call (it cannot start the
+Listening state without the wake word). `{"type":"intercom","state":"start","mode":"duplex","listening":true}`
+makes the ring spin blue, as after the wake word, instead of the call colour.
+
+| What | Where |
+|---|---|
+| Parse `listening` in the `start` branch; set `intercom_listening_` before `StartIntercom` | `main/application.cc`, `HandleIntercomMessage()` |
+| A repeated `start` refreshes the LEDs; `StopIntercom` clears the flag | `main/application.cc`, `StartIntercom()`, `StopIntercom()` |
+| Member `intercom_listening_`, `IsIntercomListening()` (only while the mic is on) | `main/application.h` |
+| Blue spin while Intercom and listening | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
+
+## 12. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

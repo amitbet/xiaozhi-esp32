@@ -124,6 +124,8 @@ public:
     void IntercomKey();
     /** A room-to-room call is waiting for the call key, on either end (the LED ring blinks green). */
     bool IsIntercomRinging() const { return intercom_ring_ != kIntercomRingNone; }
+    /** The hub listens for a spoken reply in this call ("listening": true): the ring spins blue as after the wake word. */
+    bool IsIntercomListening() const { return intercom_listening_ && intercom_mic_enabled_; }
     /** The LED colour a notify asked for ("led"), while it shows; 0-255 per channel. */
     bool GetNotifyLight(uint8_t& red, uint8_t& green, uint8_t& blue) const;
     AudioService& GetAudioService() { return audio_service_; }
@@ -165,6 +167,7 @@ private:
     bool intercom_mic_enabled_ = false;     // Duplex intercom streams the microphone; receive-only does not
     std::string intercom_caller_;
     bool intercom_chime_ = false;           // Play the popup when a call starts (off by default)
+    bool intercom_listening_ = false;       // The hub is waiting for a spoken reply (assistant follow-up)
     std::string device_name_;  // Intercom room name (NVS "intercom"/"name")
     IntercomRing intercom_ring_ = kIntercomRingNone;  // room call waiting for the call key
     std::string intercom_ring_text_;  // status while it waits, e.g. "Call from Kitchen"

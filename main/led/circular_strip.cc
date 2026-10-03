@@ -202,6 +202,13 @@ void CircularStrip::OnStateChanged() {
         Breathe(low, high, 30);
         return;
     }
+    if (device_state == kDeviceStateIntercom && app.IsIntercomListening()) {
+        // The hub waits for a spoken reply: the same spinning blue as after the wake word
+        StripColor low = { 0, 0, low_brightness_ };
+        StripColor high = { 0, low_brightness_, default_brightness_ };
+        Scroll(low, high, 2, 80);
+        return;
+    }
     if (device_state == kDeviceStateNotifying) {
         // Plain notifies (rings, spoken replies) are soft white, so a colour stands out
         uint8_t level = default_brightness_ / 2;
