@@ -124,6 +124,8 @@ public:
     void IntercomKey();
     /** A room-to-room call is waiting for the call key, on either end (the LED ring blinks green). */
     bool IsIntercomRinging() const { return intercom_ring_ != kIntercomRingNone; }
+    /** The LED colour a notify asked for ("led"), while it shows; 0-255 per channel. */
+    bool GetNotifyLight(uint8_t& red, uint8_t& green, uint8_t& blue) const;
     AudioService& GetAudioService() { return audio_service_; }
     
     /**
@@ -167,6 +169,9 @@ private:
     IntercomRing intercom_ring_ = kIntercomRingNone;  // room call waiting for the call key
     std::string intercom_ring_text_;  // status while it waits, e.g. "Call from Kitchen"
     int intercom_ring_ticks_ = 0;     // seconds before a ring the hub stopped refreshing expires
+    bool notify_light_ = false;        // a notify asked for an LED colour (shown while it plays)
+    uint8_t notify_light_rgb_[3] = {};
+    int notify_light_ticks_ = 0;       // seconds the colour stays after the audio ends ("led_s")
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -195,6 +200,7 @@ private:
     void SetIntercomMic(bool enabled);
     void StopIntercom(bool notify_server);
     void SetIntercomRing(IntercomRing ring, std::string text);
+    void SetNotifyLight(const std::string& color, int seconds);
     const char* StandbyStatus() const;
 
     // Activation task (runs in background)

@@ -191,6 +191,23 @@ void CircularStrip::OnStateChanged() {
         Blink(color, 400);
         return;
     }
+    // A notify that asked for a colour ("led") breathes in it while it plays and for its led_s
+    uint8_t red, green, blue;
+    if ((device_state == kDeviceStateIdle || device_state == kDeviceStateNotifying) &&
+        app.GetNotifyLight(red, green, blue)) {
+        auto scale = [](uint8_t value, uint8_t level) { return static_cast<uint8_t>(value * level / 255); };
+        StripColor low = { scale(red, low_brightness_), scale(green, low_brightness_), scale(blue, low_brightness_) };
+        StripColor high = { scale(red, default_brightness_), scale(green, default_brightness_),
+                            scale(blue, default_brightness_) };
+        Breathe(low, high, 30);
+        return;
+    }
+    if (device_state == kDeviceStateNotifying) {
+        // Plain notifies (rings, spoken replies) are soft white, so a colour stands out
+        uint8_t level = default_brightness_ / 2;
+        SetAllColor({ level, level, level });
+        return;
+    }
 #endif
     switch (device_state) {
         case kDeviceStateStarting: {

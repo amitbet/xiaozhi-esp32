@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7) the silent wake word (item 8) and the K1 call key (item 9).
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7) the silent wake word (item 8), the K1 call key (item 9) and the notify LED colour (item 10).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -179,7 +179,17 @@ room call is waiting for the call key; the ring sounds are ordinary `notify` mes
 Merge notes: if upstream adds TCA9555 input handling or buttons on the expander for this board, fold K1 into it.
 The `intercom_ring_` enum lives in `Application`'s private section, before its first use.
 
-## 10. Documentation
+## 10. Notify LED colour (`"led"`, `"led_s"`; `CONFIG_ENABLE_INTERCOM`)
+
+Node-RED sends the same short ding for different events; a colour tells them apart (the front door is green).
+
+| What | Where |
+|---|---|
+| Parse `led`/`led_s` in the `"notify"` branch and call `SetNotifyLight` before `StartNotification` | `main/application.cc`, `OnIncomingJson` lambda |
+| `SetNotifyLight` (colour names), `GetNotifyLight`; seconds counted down on the clock tick | `main/application.cc`, before `IntercomKey()`; `main/application.h` |
+| Ring breathes in the colour while Idle/Notifying and the light is active; plain notifies are soft white instead of green | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
+
+## 11. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

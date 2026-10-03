@@ -16,6 +16,7 @@
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <cJSON.h>
+#include <algorithm>
 #include <cstring>
 #include <limits>
 
@@ -299,6 +300,9 @@ void Application::Run() {
 #if CONFIG_ENABLE_INTERCOM
             if (intercom_ring_ != kIntercomRingNone && --intercom_ring_ticks_ <= 0) {
                 SetIntercomRing(kIntercomRingNone, "");
+            }
+            if (notify_light_ticks_ > 0 && --notify_light_ticks_ == 0) {
+                Board::GetInstance().GetLed()->OnStateChanged();
             }
 #endif
 
@@ -645,8 +649,18 @@ void Application::InitializeProtocol() {
             // "chime": false skips the popup before the audio, e.g. when the audio is a ring
             auto chime = cJSON_GetObjectItem(root, "chime");
             bool play_chime = !cJSON_IsFalse(chime);
+            // "led": "green" lights the ring in that colour while the audio plays and, with
+            // "led_s", for that many seconds (e.g. so a short door ding is still visible later)
+            auto led = cJSON_GetObjectItem(root, "led");
+            auto led_s = cJSON_GetObjectItem(root, "led_s");
+            std::string led_color = cJSON_IsString(led) ? led->valuestring : "";
+            int led_seconds = cJSON_IsNumber(led_s) ? std::clamp(led_s->valueint, 0, 600) : 0;
             Schedule([this, url = std::string(audio_url->valuestring),
-                      subtitles = std::move(subtitles), play_chime]() mutable {
+                      subtitles = std::move(subtitles), play_chime, led_color = std::move(led_color),
+                      led_seconds]() mutable {
+#if CONFIG_ENABLE_INTERCOM
+                SetNotifyLight(led_color, led_seconds);
+#endif
                 StartNotification(std::move(url), std::move(subtitles), play_chime);
             });
 #if CONFIG_ENABLE_INTERCOM
@@ -1370,6 +1384,39 @@ void Application::SetIntercomRing(IntercomRing ring, std::string text) {
     if (state == kDeviceStateIdle || state == kDeviceStateNotifying) {
         board.GetLed()->OnStateChanged();
     }
+}
+
+void Application::SetNotifyLight(const std::string& color, int seconds) {
+    static const struct {
+        const char* name;
+        uint8_t rgb[3];
+    } kColors[] = {
+        {"green", {0, 255, 0}},     {"red", {255, 0, 0}},      {"blue", {0, 0, 255}},
+        {"yellow", {255, 160, 0}},  {"orange", {255, 60, 0}},  {"purple", {160, 0, 255}},
+        {"cyan", {0, 255, 255}},    {"white", {255, 255, 255}},
+    };
+    notify_light_ = false;
+    notify_light_ticks_ = 0;
+    for (const auto& c : kColors) {
+        if (color == c.name) {
+            std::copy(c.rgb, c.rgb + 3, notify_light_rgb_);
+            notify_light_ = true;
+            notify_light_ticks_ = seconds;
+        }
+    }
+    if (!color.empty() && !notify_light_) {
+        ESP_LOGW(TAG, "Unknown notify led colour: %s", color.c_str());
+    }
+}
+
+bool Application::GetNotifyLight(uint8_t& red, uint8_t& green, uint8_t& blue) const {
+    if (!notify_light_ || (notify_light_ticks_ <= 0 && GetDeviceState() != kDeviceStateNotifying)) {
+        return false;
+    }
+    red = notify_light_rgb_[0];
+    green = notify_light_rgb_[1];
+    blue = notify_light_rgb_[2];
+    return true;
 }
 
 void Application::IntercomKey() {

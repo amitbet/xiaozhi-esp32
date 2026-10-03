@@ -28,6 +28,8 @@ MQTT device, this is the existing MQTT control topic:
 
 `chime` is optional. The device plays its built-in popup before the audio unless `chime` is `false`. Set it to `false` when the audio is itself an alert, such as a ring.
 
+`led` and `led_s` are optional (intercom builds, LED ring boards). `led` names a colour (`green`, `red`, `blue`, `yellow`, `orange`, `purple`, `cyan`, `white`); the ring breathes in it while the audio plays and for `led_s` seconds (0-600) after the message arrives, so a short sound stays visible. Without `led`, a notify shows soft white on intercom builds.
+
 `subtitles` is optional. Each entry contains the media start time in milliseconds and the text to display. The device sorts entries by `start_ms` and updates the display only when playback crosses a new subtitle entry.
 
 The message has no acknowledgement, notification ID, state, kind, or expiry field. Delivery is best effort and only applies to online devices.
