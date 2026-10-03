@@ -155,6 +155,42 @@ private:
         });
     }
 
+#if CONFIG_ENABLE_INTERCOM
+    // K1 (EXIO9 on the TCA9555) is the intercom call key. The expander's interrupt line is not
+    // wired to the ESP32, so a small task polls it.
+    static void CallKeyTask(void* arg) {
+        auto expander = static_cast<esp_io_expander_handle_t>(arg);
+        uint32_t level = 0;
+        esp_io_expander_get_level(expander, IO_EXPANDER_PIN_NUM_9, &level);
+        const uint32_t released = level;  // the level at boot, when nobody is pressing it
+        bool down = false;
+        int stable = 0;
+        while (true) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            if (esp_io_expander_get_level(expander, IO_EXPANDER_PIN_NUM_9, &level) != ESP_OK) {
+                continue;
+            }
+            bool pressed = level != released;
+            if (pressed == down) {
+                stable = 0;
+                continue;
+            }
+            if (++stable < 2) {
+                continue;  // 40 ms debounce
+            }
+            stable = 0;
+            down = pressed;
+            if (down) {
+                Application::GetInstance().IntercomKey();
+            }
+        }
+    }
+
+    void InitializeCallKey() {
+        xTaskCreate(CallKeyTask, "call_key", 3072, io_expander, 2, nullptr);
+    }
+#endif
+
     void InitializeCamera() {
         static esp_cam_ctlr_dvp_pin_config_t dvp_pin_config = {
             .data_width = CAM_CTLR_DATA_WIDTH_8,
@@ -202,6 +238,9 @@ public:
         InitializeTca9555();
         InitializeSpi();
         InitializeButtons();
+#if CONFIG_ENABLE_INTERCOM
+        InitializeCallKey();
+#endif
         #ifdef LCD_TYPE_JD9853_SERIAL
         InitializeJd9853Display(); 
         #else

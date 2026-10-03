@@ -120,6 +120,10 @@ public:
     /** Intercom room name shown instead of "Standby" when idle; persisted in NVS. */
     void SetDeviceName(const std::string& name);
     const std::string& GetDeviceName() const { return device_name_; }
+    /** Intercom call key (K1): answers or cancels a ringing room call, hangs up, else starts the assistant. */
+    void IntercomKey();
+    /** A room-to-room call is waiting for the call key, on either end (the LED ring blinks green). */
+    bool IsIntercomRinging() const { return intercom_ring_ != kIntercomRingNone; }
     AudioService& GetAudioService() { return audio_service_; }
     
     /**
@@ -130,6 +134,8 @@ public:
     void ResetProtocol();
 
 private:
+    enum IntercomRing { kIntercomRingNone, kIntercomRingIncoming, kIntercomRingOutgoing };
+
     Application();
     ~Application();
 
@@ -158,6 +164,9 @@ private:
     std::string intercom_caller_;
     bool intercom_chime_ = false;           // Play the popup when a call starts (off by default)
     std::string device_name_;  // Intercom room name (NVS "intercom"/"name")
+    IntercomRing intercom_ring_ = kIntercomRingNone;  // room call waiting for the call key
+    std::string intercom_ring_text_;  // status while it waits, e.g. "Call from Kitchen"
+    int intercom_ring_ticks_ = 0;     // seconds before a ring the hub stopped refreshing expires
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -185,6 +194,7 @@ private:
     void ContinueStartIntercom();
     void SetIntercomMic(bool enabled);
     void StopIntercom(bool notify_server);
+    void SetIntercomRing(IntercomRing ring, std::string text);
     const char* StandbyStatus() const;
 
     // Activation task (runs in background)

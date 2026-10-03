@@ -40,13 +40,26 @@ End a call:
 
 Queued audio finishes playing after `stop`. The audio channel stays open. Send `goodbye` (MQTT) or close the WebSocket to release it. A server-side `goodbye` also ends an active call.
 
+Wait for the call key (room-to-room calls):
+
+```json
+{ "type": "intercom", "state": "ring", "text": "Call from Kitchen" }
+{ "type": "intercom", "state": "dial", "text": "Calling Bedroom" }
+```
+
+- `ring` marks the device as being called: the call key answers. `dial` marks it as the caller: the call key cancels.
+- While either is pending the device shows `text` as its status and blinks its LED ring green, also while a `notify` ring sound plays.
+- The device plays no sound by itself. Send a `notify` with a ring sound (or a ringback tone) alongside.
+- The pending state expires 15 seconds after the last `ring`/`dial`, so a server repeats them with each ring sound. `stop` or `start` clears it at once.
+
 ## Device to server
 
 The device sends `intercom` messages with its `session_id`:
 
 | `state` | Meaning |
 |---|---|
-| `stop` | The user hung up on the device (button press or wake-word invoke). |
+| `stop` | The user hung up on the device (button press or wake-word invoke), or cancelled a pending `dial` with the call key. |
+| `answer` | The call key was pressed while a `ring` was pending. The server starts the call (`start` to both devices). |
 | `busy` | A `start` arrived while the device was not idle, for example during a voice assistant conversation or an OTA upgrade. The call was rejected. |
 
 ## Room name
@@ -67,3 +80,4 @@ The device stores the name (at most 40 characters) and shows it instead of "Stan
 - In `duplex` mode the device streams the microphone with the same AFE path as realtime conversations, including AEC when enabled. Without AEC the remote side hears its own voice echoed from the speaker, so use push-to-talk (`receive`/`duplex` switching) instead.
 - Network loss, a protocol error, or a server `goodbye` returns the device to `Idle`.
 - The device treats the channel as timed out after 120 seconds without incoming data. During a long, silent call, the server must keep sending audio (silence frames are fine).
+- On the Waveshare ESP32-S3-AUDIO-Board, **K1** is the call key: it answers a pending `ring`, cancels a pending `dial`, hangs up a call, and otherwise works like BOOT (starts listening, so a server with speech recognition can take "call the kitchen").

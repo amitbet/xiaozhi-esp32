@@ -5,7 +5,7 @@ fixes so the firmware works with a self-hosted hub and a standard Mosquitto brok
 `xiaozhi-hub` in the [homeauto](https://github.com/amitbet) repository (`compose/xiaozhi-hub`).
 
 - Upstream: `78/xiaozhi-esp32`, forked at `64b57d0`.
-- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7) and the silent wake word (item 8).
+- Fork commits: `747f58d` (intercom + MQTT fixes), `eb276d4` (this file), then the room-name tool (item 5), audio controls (item 6) and silent calls plus `notify` without the popup (item 7) the silent wake word (item 8) and the K1 call key (item 9).
 - Protocol reference: [`docs/intercom.md`](docs/intercom.md).
 
 Line numbers below are as of `747f58d`; search for the quoted symbols after an upstream merge, since lines drift.
@@ -162,7 +162,24 @@ alert (the firmware plays `OGG_VIBRATION` with every alert) and closes the chann
 
 Merge notes: if upstream adds more popup calls on the wake path, gate them with `kWakeWordSound` too.
 
-## 9. Documentation
+## 9. Call key K1 and room-to-room ringing (`CONFIG_ENABLE_INTERCOM`)
+
+The hub rings one speaker from another ("Jarvis, call the kitchen"). The firmware only tracks whether a
+room call is waiting for the call key; the ring sounds are ordinary `notify` messages from the hub.
+
+| What | Where |
+|---|---|
+| K1 polled on the TCA9555 (EXIO9; the expander's interrupt is not wired) by a small task, 20 ms period, 40 ms debounce; idle level read at boot | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `CallKeyTask`/`InitializeCallKey` |
+| `Application::IntercomKey()`: hang up in a call, `answer` a pending ring, `stop` a pending dial, else `ToggleChatState()` | `main/application.cc`, before `StandbyStatus()`; declaration `main/application.h` (public) |
+| `intercom` `ring`/`dial` messages set `intercom_ring_` and its status text; `stop` and `start` clear it | `HandleIntercomMessage`, `StartIntercom`, `SetIntercomRing` in `main/application.cc` |
+| Pending ring expires 15 s after the last refresh | `MAIN_EVENT_CLOCK_TICK` branch of the main loop |
+| `StandbyStatus()` returns the ring text; the Notifying state keeps it while a ring plays | `main/application.cc` |
+| LED ring blinks green while a ring is pending (Idle or Notifying) | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
+
+Merge notes: if upstream adds TCA9555 input handling or buttons on the expander for this board, fold K1 into it.
+The `intercom_ring_` enum lives in `Application`'s private section, before its first use.
+
+## 10. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.
 - `FORK_NOTES.md`: this file.

@@ -183,6 +183,15 @@ void CircularStrip::SetBrightness(uint8_t default_brightness, uint8_t low_bright
 void CircularStrip::OnStateChanged() {
     auto& app = Application::GetInstance();
     auto device_state = app.GetDeviceState();
+#if CONFIG_ENABLE_INTERCOM
+    // A room call waiting for the call key blinks green, also while its ring sound plays
+    if ((device_state == kDeviceStateIdle || device_state == kDeviceStateNotifying) &&
+        app.IsIntercomRinging()) {
+        StripColor color = { low_brightness_, default_brightness_, low_brightness_ };
+        Blink(color, 400);
+        return;
+    }
+#endif
     switch (device_state) {
         case kDeviceStateStarting: {
             StripColor low = { 0, 0, 0 };

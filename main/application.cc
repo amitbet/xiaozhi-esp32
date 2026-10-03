@@ -296,6 +296,12 @@ void Application::Run() {
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
 
+#if CONFIG_ENABLE_INTERCOM
+            if (intercom_ring_ != kIntercomRingNone && --intercom_ring_ticks_ <= 0) {
+                SetIntercomRing(kIntercomRingNone, "");
+            }
+#endif
+
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
                 SystemInfo::PrintHeapStats();
@@ -1092,7 +1098,9 @@ void Application::HandleStateChangedEvent() {
             audio_service_.ResetDecoder();
             break;
         case kDeviceStateNotifying:
-            display->SetStatus(Lang::Strings::SPEAKING);
+            // A room call's ring sound keeps the "Call from ..." status
+            display->SetStatus(intercom_ring_ != kIntercomRingNone ? StandbyStatus()
+                                                                   : Lang::Strings::SPEAKING);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(audio_service_.IsAfeWakeWord());
             break;
@@ -1238,7 +1246,19 @@ void Application::HandleIntercomMessage(const cJSON* root) {
             StartIntercom(mic_enabled, std::move(caller_str), chime);
         });
     } else if (strcmp(state->valuestring, "stop") == 0) {
-        Schedule([this]() { StopIntercom(false); });
+        Schedule([this]() {
+            SetIntercomRing(kIntercomRingNone, "");
+            StopIntercom(false);
+        });
+    } else if (strcmp(state->valuestring, "ring") == 0 || strcmp(state->valuestring, "dial") == 0) {
+        // A room-to-room call waiting for the call key: "ring" on the called speaker (K1 answers),
+        // "dial" on the calling one (K1 cancels). The hub repeats it with every ring sound.
+        auto ring = strcmp(state->valuestring, "ring") == 0 ? kIntercomRingIncoming : kIntercomRingOutgoing;
+        auto text = cJSON_GetObjectItem(root, "text");
+        std::string text_str = cJSON_IsString(text) ? text->valuestring : "";
+        Schedule([this, ring, text_str = std::move(text_str)]() mutable {
+            SetIntercomRing(ring, std::move(text_str));
+        });
     } else {
         ESP_LOGW(TAG, "Unknown intercom state: %s", state->valuestring);
     }
@@ -1246,6 +1266,7 @@ void Application::HandleIntercomMessage(const cJSON* root) {
 
 void Application::StartIntercom(bool mic_enabled, std::string caller, bool chime) {
     auto state = GetDeviceState();
+    intercom_ring_ = kIntercomRingNone;  // answered; the call state takes over the screen and LEDs
 
     if (state == kDeviceStateIntercom) {
         // A repeated start switches mode mid-call, e.g. for push-to-talk
@@ -1331,7 +1352,52 @@ void Application::StopIntercom(bool notify_server) {
     SetDeviceState(kDeviceStateIdle);
 }
 
+void Application::SetIntercomRing(IntercomRing ring, std::string text) {
+    constexpr int kRingTimeoutS = 15;  // the hub refreshes a ring every few seconds
+    intercom_ring_ticks_ = kRingTimeoutS;
+    if (ring == intercom_ring_ && (ring == kIntercomRingNone || text == intercom_ring_text_)) {
+        return;
+    }
+    intercom_ring_ = ring;
+    intercom_ring_text_ = ring == kIntercomRingNone ? "" : std::move(text);
+    auto state = GetDeviceState();
+    auto& board = Board::GetInstance();
+    if ((state == kDeviceStateIdle && last_error_message_.empty()) || state == kDeviceStateNotifying) {
+        board.GetDisplay()->SetStatus(state == kDeviceStateIdle || ring != kIntercomRingNone
+                                          ? StandbyStatus()
+                                          : Lang::Strings::SPEAKING);
+    }
+    if (state == kDeviceStateIdle || state == kDeviceStateNotifying) {
+        board.GetLed()->OnStateChanged();
+    }
+}
+
+void Application::IntercomKey() {
+    Schedule([this]() {
+        auto state = GetDeviceState();
+        if (state == kDeviceStateIntercom) {
+            StopIntercom(true);
+            return;
+        }
+        if (intercom_ring_ != kIntercomRingNone && protocol_) {
+            bool answer = intercom_ring_ == kIntercomRingIncoming;
+            ESP_LOGI(TAG, "Call key: %s", answer ? "answer" : "cancel");
+            protocol_->SendIntercomState(answer ? "answer" : "stop");
+            SetIntercomRing(kIntercomRingNone, "");
+            if (state == kDeviceStateNotifying) {
+                StopNotification();  // silence the ring now; the hub's start follows
+            }
+            return;
+        }
+        // Nothing ringing: same as BOOT, which starts the assistant ("call the kitchen")
+        ToggleChatState();
+    });
+}
+
 const char* Application::StandbyStatus() const {
+    if (intercom_ring_ != kIntercomRingNone && !intercom_ring_text_.empty()) {
+        return intercom_ring_text_.c_str();
+    }
     // Only intercom builds show the room name: some displays match the Standby string for emoji
     return device_name_.empty() ? Lang::Strings::STANDBY : device_name_.c_str();
 }
