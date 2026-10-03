@@ -20,8 +20,7 @@ struct StripColor {
 
 class CircularStrip : public Led {
 public:
-    // dark_leds: LEDs chained after the ring that are kept off (they latch stray data otherwise)
-    CircularStrip(gpio_num_t gpio, uint16_t max_leds, uint16_t dark_leds = 0);
+    CircularStrip(gpio_num_t gpio, uint16_t max_leds);
     virtual ~CircularStrip();
 
     void OnStateChanged() override;

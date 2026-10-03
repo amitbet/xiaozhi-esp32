@@ -202,16 +202,16 @@ makes the ring spin blue, as after the wake word, instead of the call colour.
 | Member `intercom_listening_`, `IsIntercomListening()` (only while the mic is on) | `main/application.h` |
 | Blue spin while Intercom and listening | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
 
-## 12. Stray LED after the ring (Waveshare ESP32-S3-AUDIO-Board)
+## 12. LED ring has 7 LEDs (Waveshare ESP32-S3-AUDIO-Board)
 
-A 7th LED on the strip's data line, past the ring of 6, never got data and showed whatever it latched at
-boot (stuck red, later blue). `CircularStrip` takes `dark_leds`: the driver is sized for the ring plus those
-LEDs and only the ring is drawn, so every refresh sends black to them.
+Upstream drives this board's ring as 6 LEDs; the board has 7 (Waveshare wiki: "7x surround RGB LEDs",
+GPIO 38, WS2812). The 7th never got data and showed whatever it latched at boot (stuck red, later blue).
 
 | What | Where |
 |---|---|
-| `dark_leds` constructor argument (default 0), `max_leds` = ring + dark | `main/led/circular_strip.h`, `circular_strip.cc` constructor |
-| `CircularStrip led(BUILTIN_LED_GPIO, 6, 1)` | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `GetLed()` |
+| `CircularStrip led(BUILTIN_LED_GPIO, 7)` (upstream: 6) | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `GetLed()` |
+
+Merge note: if upstream fixes the count itself, take theirs.
 
 ## 13. Documentation
 
