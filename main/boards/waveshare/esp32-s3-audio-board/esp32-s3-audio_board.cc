@@ -252,8 +252,8 @@ public:
 
     virtual Led* GetLed() override {
         // The ring has 7 LEDs (Waveshare wiki: "7x surround RGB LEDs"); with 6 the last one never got
-        // data and kept a random colour
-        static CircularStrip led(BUILTIN_LED_GPIO, 7);
+        // data and kept a random colour. Its LEDs take RGB, not WS2812's GRB: with GRB red and green swap
+        static CircularStrip led(BUILTIN_LED_GPIO, 7, LED_STRIP_COLOR_COMPONENT_FMT_RGB);
         return &led;
     }
 

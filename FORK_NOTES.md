@@ -202,16 +202,19 @@ makes the ring spin blue, as after the wake word, instead of the call colour.
 | Member `intercom_listening_`, `IsIntercomListening()` (only while the mic is on) | `main/application.h` |
 | Blue spin while Intercom and listening | `main/led/circular_strip.cc`, top of `OnStateChanged()` |
 
-## 12. LED ring has 7 LEDs (Waveshare ESP32-S3-AUDIO-Board)
+## 12. LED ring: 7 LEDs in RGB order (Waveshare ESP32-S3-AUDIO-Board)
 
 Upstream drives this board's ring as 6 LEDs; the board has 7 (Waveshare wiki: "7x surround RGB LEDs",
-GPIO 38, WS2812). The 7th never got data and showed whatever it latched at boot (stuck red, later blue).
+GPIO 38). The 7th never got data and showed whatever it latched at boot (stuck red, later blue).
+The LEDs also take RGB byte order, not WS2812's GRB: with upstream's GRB, red and green swap (a green
+notify showed red, a red one green; blue was right). Checked on hardware 2026-10-04.
 
 | What | Where |
 |---|---|
-| `CircularStrip led(BUILTIN_LED_GPIO, 7)` (upstream: 6) | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `GetLed()` |
+| `color_format` constructor argument (default GRB) | `main/led/circular_strip.h`, `circular_strip.cc` constructor |
+| `CircularStrip led(BUILTIN_LED_GPIO, 7, LED_STRIP_COLOR_COMPONENT_FMT_RGB)` (upstream: 6, GRB) | `main/boards/waveshare/esp32-s3-audio-board/esp32-s3-audio_board.cc`, `GetLed()` |
 
-Merge note: if upstream fixes the count itself, take theirs.
+Merge note: if upstream fixes the count or order itself, take theirs.
 
 ## 13. Documentation
 
