@@ -216,6 +216,10 @@ notify showed red, a red one green; blue was right). Checked on hardware 2026-10
 
 Merge note: if upstream fixes the count or order itself, take theirs.
 
+With the order fixed, Speaking and Intercom (upstream `{low, default, low}`) turned green, the same as the front-door
+notify. Intercom builds give them `{default, low, low}`, the pink they showed before the fix
+(`main/led/circular_strip.cc`, `OnStateChanged()` switch).
+
 ## 13. Documentation
 
 - `docs/intercom.md`: the intercom protocol, transport requirements, and items 3–4.

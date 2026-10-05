@@ -253,9 +253,21 @@ void CircularStrip::OnStateChanged() {
             SetAllColor(color);
             break;
         }
+#if CONFIG_ENABLE_INTERCOM
+        case kDeviceStateSpeaking:
+        case kDeviceStateIntercom: {
+            // Pink, the colour these showed before the ring's RGB order was fixed, so a spoken reply
+            // or a call doesn't look like the green front-door notify
+            StripColor color = { default_brightness_, low_brightness_, low_brightness_ };
+            SetAllColor(color);
+            break;
+        }
+        case kDeviceStateNotifying: {
+#else
         case kDeviceStateSpeaking:
         case kDeviceStateNotifying:
         case kDeviceStateIntercom: {
+#endif
             StripColor color = { low_brightness_, default_brightness_, low_brightness_ };
             SetAllColor(color);
             break;
